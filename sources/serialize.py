@@ -1,0 +1,70 @@
+"""
+序列化工具模块
+
+提供电路仿真结果的CSV保存功能
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import csv
+
+
+def save_results_to_csv(t: np.ndarray, results: dict, stage_name: str, 
+                        u0: float, filename: str | None = None) -> None:
+    """
+    将仿真结果保存为CSV文件
+    
+    参数：
+        t: 时间数组（秒）
+        results: 包含各支路电流和电压的字典，必须包含以下键：
+            - 'i_s': 电流源电流
+            - 'i_r': 电阻电流
+            - 'i_c': 电容电流
+            - 'i_rg': Rg电流
+            - 'u_s': 电流源电压
+            - 'u_c': 电容电压
+            - 'u_rg': Rg电压
+        stage_name: 阶段名称（如 'Stage 1', 'Stage 2'），用于生成默认文件名
+        u0: 初始电压（用于生成文件名）
+        filename: 输出文件名（可选，默认自动生成）
+    """
+    if filename is None:
+        # 生成默认文件名，将 stage_name 转换为小写并替换空格
+        stage_suffix = stage_name.lower().replace(' ', '_')
+        filename = f"{stage_suffix}_results_u0_{u0:.0f}V.csv"
+    
+    # 准备数据
+    t_ms = t * 1000  # 转换为毫秒
+    
+    # CSV表头
+    headers = [
+        '时间 (ms)',
+        '时间 (s)',
+        'i_s (A)', 'i_R (A)', 'i_C (A)', 'i_Rg (A)',
+        'u_C (V)', 'u_Rg (V)', 'u_s (V)'
+    ]
+    
+    # 写入CSV文件
+    with open(filename, 'w', newline='', encoding='utf-8-sig') as f:  # utf-8-sig支持Excel中文显示
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        
+        # 写入数据行
+        for i in range(len(t)):
+            row = [
+                f"{t_ms[i]:.6f}",
+                f"{t[i]:.12e}",
+                f"{results['i_s'][i]:.6f}",
+                f"{results['i_r'][i]:.6f}",
+                f"{results['i_c'][i]:.6f}",
+                f"{results['i_rg'][i]:.6f}",
+                f"{results['u_c'][i]:.6f}",
+                f"{results['u_rg'][i]:.6f}",
+                f"{results['u_s'][i]:.6f}"
+            ]
+            writer.writerow(row)
+    
+    print(f"结果已保存至CSV文件: {filename}")
+    print(f"  共 {len(t)} 行数据\n")
+
