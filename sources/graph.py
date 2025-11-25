@@ -139,6 +139,7 @@ def plot_circuit_results(
             ax_twin.tick_params(axis='y', labelcolor='r')
         
         # 对齐0点：计算数据范围并设置y轴范围，使得0点对齐
+        # 使用不同的缩放因子（电流1.1，电压1.2）避免曲线重叠
         if i_key in results and u_key in results:
             i_data = results[i_key] / 1000  # kA
             u_data = results[u_key] / 1000  # kV
@@ -153,13 +154,37 @@ def plot_circuit_results(
             
             # 设置y轴范围，使得0点对齐
             # 使用对称范围，确保0点在中间
+            # 电流使用1.1的缩放因子，电压使用1.2的缩放因子，避免曲线重叠
             if i_range > 0:
-                ax.set_ylim(-i_range * 1.1, i_range * 1.1)  # 留10%的边距
+                ax.set_ylim(-i_range * 1.1, i_range * 1.1)  # 电流：1.1倍范围
+            else:
+                ax.set_ylim(-0.1, 0.1)  # 默认范围
+            
             if u_range > 0:
-                ax_twin.set_ylim(-u_range * 1.1, u_range * 1.1)  # 留10%的边距
+                ax_twin.set_ylim(-u_range * 1.2, u_range * 1.2)  # 电压：1.2倍范围
+            else:
+                ax_twin.set_ylim(-0.1, 0.1)  # 默认范围
             
             # 使用辅助函数确保0点对齐（处理刻度不同的情况）
             align_yaxis_zeros(ax, ax_twin)
+        elif i_key in results:
+            # 只有电流数据
+            i_data = results[i_key] / 1000  # kA
+            i_min, i_max = np.min(i_data), np.max(i_data)
+            i_range = max(abs(i_min), abs(i_max))
+            if i_range > 0:
+                ax.set_ylim(-i_range * 1.1, i_range * 1.1)
+            else:
+                ax.set_ylim(-0.1, 0.1)
+        elif u_key in results:
+            # 只有电压数据
+            u_data = results[u_key] / 1000  # kV
+            u_min, u_max = np.min(u_data), np.max(u_data)
+            u_range = max(abs(u_min), abs(u_max))
+            if u_range > 0:
+                ax_twin.set_ylim(-u_range * 1.2, u_range * 1.2)
+            else:
+                ax_twin.set_ylim(-0.1, 0.1)
         
         # 设置标题和标签
         ax.set_xlabel('时间 (ms)', fontsize=10)
@@ -211,6 +236,8 @@ def plot_circuit_results(
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
         print(f"图表已保存至: {save_path}")
+    else:
+        print("警告: 未指定保存路径，图表未保存")
     
-    plt.show()
+    plt.close()  # 关闭图形，释放内存
 

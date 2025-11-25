@@ -112,25 +112,15 @@ from source import neutral_current
 from graph import plot_circuit_results
 from serialize import save_results_to_csv
 from reader import get_stage1_final_values
+from circuit_params import (
+    C, R, Rg, L,
+    U_D1_THRESHOLD, U_D2_THRESHOLD, U_SCR_THRESHOLD,
+    R_D1, R_D2, R_SCR,
+    U_BYPASS_THRESHOLD, R_BYPASS_TOTAL,
+    U0_CASE1, U0_CASE2
+)
 
-# ==================== 电路参数 ====================
-C = 36e-3  # 36 mF = 0.036 F
-R = 500.0  # 500 Ω
-Rg = 0.5  # 0.5 Ω
-L = 30e-6  # 30 µH = 0.00003 H
-
-# 非线性器件参数
-U_D1_THRESHOLD = 0.75  # D1、D2导通阈值电压（V）
-U_D2_THRESHOLD = 0.75  # D2导通阈值电压（V）
-U_SCR_THRESHOLD = 0.88  # SCR1导通阈值电压（V）
-R_D1 = 0.00007  # D1、D2等效电阻（Ω）
-R_D2 = 0.00007  # D2等效电阻（Ω）
-R_SCR = 0.000052  # SCR1等效电阻（Ω）
-
-# 电子旁路总阈值电压（D1 + D2 + SCR1）
-U_BYPASS_THRESHOLD = U_D1_THRESHOLD + U_D2_THRESHOLD + U_SCR_THRESHOLD  # 2.38 V
-R_BYPASS_TOTAL = R_D1 + R_D2 + R_SCR  # 0.000192 Ω
-
+# ==================== 时间参数 ====================
 # 时间范围：200微秒到50毫秒
 T_START = 200e-6  # 200 微秒 = 0.0002 秒
 T_END = 50e-3  # 50 毫秒 = 0.05 秒
@@ -532,14 +522,14 @@ if __name__ == "__main__":
     print("从Stage 1的最终值继承初始条件\n")
     
     # 情况1：初始电压为 0V（从Stage 1继承）
-    stage1_u0_case1 = 0.0
+    stage1_u0_case1 = U0_CASE1
     try:
         u_c_stage1_final, _ = get_stage1_final_values(stage1_u0_case1, results_dir)
         print(f"从Stage 1 (u0={stage1_u0_case1}V) 继承: u_C(200µs) = {u_c_stage1_final:.6f} V")
         u0_case1 = u_c_stage1_final
     except FileNotFoundError:
-        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case1}V)，使用默认值 0.0V")
-        u0_case1 = 0.0
+        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case1}V)，使用默认值 {U0_CASE1}V")
+        u0_case1 = U0_CASE1
     
     t1, u_c1, i_l1, results1 = simulate_stage2(u0_case1)
     print_summary(t1, u_c1, i_l1, results1, u0_case1)
@@ -603,14 +593,14 @@ if __name__ == "__main__":
                         save_path=str(img_path1))
     
     # 情况2：初始电压为 750V（从Stage 1继承）
-    stage1_u0_case2 = 750.0
+    stage1_u0_case2 = U0_CASE2
     try:
         u_c_stage1_final, _ = get_stage1_final_values(stage1_u0_case2, results_dir)
         print(f"\n从Stage 1 (u0={stage1_u0_case2}V) 继承: u_C(200µs) = {u_c_stage1_final:.6f} V")
         u0_case2 = u_c_stage1_final
     except FileNotFoundError:
-        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case2}V)，使用默认值 750.0V")
-        u0_case2 = 750.0
+        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case2}V)，使用默认值 {U0_CASE2}V")
+        u0_case2 = U0_CASE2
     
     t2, u_c2, i_l2, results2 = simulate_stage2(u0_case2)
     print_summary(t2, u_c2, i_l2, results2, u0_case2)

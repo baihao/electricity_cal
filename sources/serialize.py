@@ -43,6 +43,7 @@ def save_results_to_csv(t: np.ndarray, results: dict, stage_name: str,
     # 定义字段顺序和显示名称
     field_mapping = [
         ('i_s', 'i_s (A)'),
+        ('i_k3', 'i_K3 (A)'),
         ('i_l', 'i_L (A)'),
         ('i_r', 'i_R (A)'),
         ('i_c', 'i_C (A)'),
