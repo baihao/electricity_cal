@@ -37,13 +37,31 @@ def save_results_to_csv(t: np.ndarray, results: dict, stage_name: str,
     # 准备数据
     t_ms = t * 1000  # 转换为毫秒
     
-    # CSV表头
-    headers = [
-        '时间 (ms)',
-        '时间 (s)',
-        'i_s (A)', 'i_R (A)', 'i_C (A)', 'i_Rg (A)',
-        'u_C (V)', 'u_Rg (V)', 'u_s (V)'
+    # CSV表头 - 根据results字典中可用的键动态生成
+    base_headers = ['时间 (ms)', '时间 (s)']
+    
+    # 定义字段顺序和显示名称
+    field_mapping = [
+        ('i_s', 'i_s (A)'),
+        ('i_l', 'i_L (A)'),
+        ('i_r', 'i_R (A)'),
+        ('i_c', 'i_C (A)'),
+        ('i_bypass', 'i_bypass (A)'),
+        ('i_rg', 'i_Rg (A)'),
+        ('u_c', 'u_C (V)'),
+        ('u_l', 'u_L (V)'),
+        ('u_bypass', 'u_bypass (V)'),
+        ('u_rg', 'u_Rg (V)'),
+        ('u_s', 'u_s (V)'),
     ]
+    
+    # 构建表头和数据字段
+    headers = base_headers.copy()
+    available_fields = []
+    for key, label in field_mapping:
+        if key in results:
+            headers.append(label)
+            available_fields.append(key)
     
     # 写入CSV文件
     with open(filename, 'w', newline='', encoding='utf-8-sig') as f:  # utf-8-sig支持Excel中文显示
@@ -54,15 +72,11 @@ def save_results_to_csv(t: np.ndarray, results: dict, stage_name: str,
         for i in range(len(t)):
             row = [
                 f"{t_ms[i]:.6f}",
-                f"{t[i]:.12e}",
-                f"{results['i_s'][i]:.6f}",
-                f"{results['i_r'][i]:.6f}",
-                f"{results['i_c'][i]:.6f}",
-                f"{results['i_rg'][i]:.6f}",
-                f"{results['u_c'][i]:.6f}",
-                f"{results['u_rg'][i]:.6f}",
-                f"{results['u_s'][i]:.6f}"
+                f"{t[i]:.12e}"
             ]
+            # 添加各字段的值
+            for key in available_fields:
+                row.append(f"{results[key][i]:.6f}")
             writer.writerow(row)
     
     print(f"结果已保存至CSV文件: {filename}")

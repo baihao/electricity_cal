@@ -116,19 +116,20 @@ def stage1_ode(t: float, u_c: np.ndarray) -> np.ndarray:
     return np.array([du_dt])  # 返回数组，形状与 y0 一致
 
 
-def simulate_stage1(u0: float, t_end: float = T_END, 
-                    method: str = 'RK45', rtol: float = 1e-8, atol: float = 1e-10) -> tuple[np.ndarray, np.ndarray, dict]:
+def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
+                    method: str = 'Radau', rtol: float = 1e-8, atol: float = 1e-10) -> tuple[np.ndarray, np.ndarray, dict]:
     """
     仿真 Stage 1（0-200微秒）的电路响应
     
     参数：
         u0: 初始电容电压（V）
         t_end: 仿真结束时间（秒），默认200微秒
+        dt: 采样间隔（秒），默认1微秒
         method: 求解器方法，可选：
-            - 'RK45': 4-5阶Runge-Kutta（默认，适合非刚性问题）
+            - 'Radau': 隐式方法（默认，适合刚性问题）
+            - 'RK45': 4-5阶Runge-Kutta（适合非刚性问题）
             - 'RK23': 2-3阶Runge-Kutta（更快但精度较低）
             - 'DOP853': 8阶Dormand-Prince（高精度）
-            - 'Radau': 隐式方法（适合刚性问题）
             - 'BDF': 后向差分公式（适合刚性问题）
         rtol: 相对容差（默认1e-8）
         atol: 绝对容差（默认1e-10）
@@ -138,8 +139,8 @@ def simulate_stage1(u0: float, t_end: float = T_END,
         u_c: 电容电压数组（V）
         results: 字典，包含各支路电流和电压
     """
-    # 时间采样点（每1微秒一个点）
-    t_eval = np.arange(T_START, t_end + DT / 2, DT)
+    # 时间采样点
+    t_eval = np.arange(T_START, t_end + dt / 2, dt)
     
     # 求解ODE
     sol = solve_ivp(
@@ -243,9 +244,10 @@ def print_solver_recommendations() -> None:
     print("   - 已改进：使用 i_C = i_s - i_R 直接从 KCL 计算\n")
     
     print("2. 求解器方法选择：")
-    print("   - RK45 (默认): 适合非刚性问题，精度和速度平衡")
+    print("   - Radau (默认): 隐式方法，适合刚性问题，数值稳定性好")
+    print("   - RK45: 4-5阶Runge-Kutta，适合非刚性问题，精度和速度平衡")
     print("   - DOP853: 8阶方法，精度最高但速度较慢")
-    print("   - Radau/BDF: 适合刚性问题（本问题通常不需要）\n")
+    print("   - BDF: 后向差分公式，适合刚性问题\n")
     
     print("3. 容差参数调整：")
     print("   - rtol (相对容差): 默认 1e-8，可调整到 1e-10 提高精度")
@@ -258,7 +260,7 @@ def print_solver_recommendations() -> None:
     print("   - 但会影响数值微分的精度（已改用直接计算）\n")
     
     print("5. 推荐配置：")
-    print("   - 方法: 'RK45' 或 'DOP853'")
+    print("   - 方法: 'Radau' (默认，适合刚性问题)")
     print("   - rtol: 1e-8 到 1e-10")
     print("   - atol: 1e-10 到 1e-12")
     print("   - 使用直接计算导数，避免数值微分\n")
