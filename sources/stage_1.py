@@ -64,20 +64,13 @@ from pathlib import Path
 from source import neutral_current
 from graph import plot_circuit_results
 from serialize import save_results_to_csv
+from circuit_params import C, R, Rg, U0_CASE1, U0_CASE2
 
-# ==================== 电路参数 ====================
-C = 36e-3  # 36 mF = 0.036 F
-R = 500.0  # 500 Ω
-Rg = 0.5  # 0.5 Ω
-
+# ==================== 时间参数 ====================
 # 时间范围：0 到 200 微秒
 T_START = 0.0
 T_END = 200e-6  # 200 微秒 = 0.0002 秒
 DT = 1e-6  # 采样间隔：1 微秒 = 0.000001 秒
-
-# 初始电压条件（两种情况）
-U0_CASE1 = 0.0  # 0V
-U0_CASE2 = 750.0  # 750V
 
 
 def stage1_ode(t: float, u_c: np.ndarray) -> np.ndarray:
