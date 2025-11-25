@@ -357,8 +357,39 @@ if __name__ == "__main__":
     csv_path1 = results_dir / f"stage_1_results_u0_{U0_CASE1:.0f}V.csv"
     save_results_to_csv(t1, results1, 'Stage 1', U0_CASE1, filename=str(csv_path1))
     
+    # 定义Stage 1的绘图配置
+    stage1_components = [
+        ('电流源', 'i_s', 'u_s', '电流源'),
+        ('电阻 R', 'i_r', 'u_c', '电阻'),
+        ('电容 C', 'i_c', 'u_c', '电容'),
+        ('电阻 Rg', 'i_rg', 'u_rg', 'Rg'),
+    ]
+    
+    stage1_summary_plots = [
+        {
+            'title': 'R, C 和电流源电流变化',
+            'ylabel': '电流 (kA)',
+            'items': [
+                ('i_s', 'i_s (电流源)', '-', 2),
+                ('i_r', 'i_R (电阻)', '-', 1.5),
+                ('i_c', 'i_C (电容)', '-', 1.5),
+            ]
+        },
+        {
+            'title': 'R, C 和电流源电压变化',
+            'ylabel': '电压 (kV)',
+            'items': [
+                ('u_s', 'u_s (电流源)', '-', 2),
+                ('u_c', 'u_R = u_C (电阻和电容)', '-', 1.5),
+            ]
+        }
+    ]
+    
     img_path1 = results_dir / "stage1_case1_results.png"
-    plot_circuit_results(t1, results1, 'Stage 1', U0_CASE1, save_path=str(img_path1))
+    plot_circuit_results(t1, results1, 'Stage 1', U0_CASE1, 
+                        components=stage1_components,
+                        summary_plots=stage1_summary_plots,
+                        save_path=str(img_path1))
     
     # 情况2：初始电压为 750V
     print("\n开始仿真情况2：初始电压 = 750V")
@@ -371,5 +402,8 @@ if __name__ == "__main__":
     save_results_to_csv(t2, results2, 'Stage 1', U0_CASE2, filename=str(csv_path2))
     
     img_path2 = results_dir / "stage1_case2_results.png"
-    plot_circuit_results(t2, results2, 'Stage 1', U0_CASE2, save_path=str(img_path2))
+    plot_circuit_results(t2, results2, 'Stage 1', U0_CASE2,
+                        components=stage1_components,
+                        summary_plots=stage1_summary_plots,
+                        save_path=str(img_path2))
 
