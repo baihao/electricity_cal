@@ -93,6 +93,26 @@ def get_stage1_final_values(u0: float, results_dir: Path | None = None) -> tuple
     return u_c_final, i_l_final
 
 
+def get_stage1_final_time_and_u_c(u0: float, results_dir: Path | None = None) -> tuple[float, float]:
+    """
+    获取Stage 1的最终时间和u_C值
+    
+    参数：
+        u0: 初始电压（V）
+        results_dir: results文件夹路径（可选）
+    
+    返回：
+        (t_final, u_C_final) 元组，t_final单位为秒
+    """
+    final_values = get_stage_final_values('Stage 1', u0, results_dir)
+    
+    # 从CSV文件读取时间（秒）
+    t_final = final_values.get('时间 (s)', 0.0)
+    u_c_final = final_values.get('u_C (V)', 0.0)
+    
+    return t_final, u_c_final
+
+
 def get_stage2_final_values(u0: float, results_dir: Path | None = None) -> tuple[float, float]:
     """
     获取Stage 2的最终值（u_C和i_L）

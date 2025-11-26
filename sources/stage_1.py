@@ -32,8 +32,9 @@ Stage 1: 0-200微秒电路仿真
 
 4. 数值求解：
    使用 scipy.integrate.solve_ivp 求解状态方程
-   时间范围：0 到 200 微秒（0 到 0.0002 秒）
-   采样间隔：1 微秒（0.000001 秒）
+   时间范围：0 到 200 毫秒（0 到 0.2 秒）
+   采样间隔：10 微秒（0.00001 秒）
+   退出条件：当 |u_C| > 800V 时自动停止仿真（事件检测）
 
 5. scipy.integrate.solve_ivp 接口约定：
    solve_ivp 要求传入的函数 fun(t, y) 必须返回 dy/dt（状态变量的导数）
@@ -67,10 +68,10 @@ from serialize import save_results_to_csv
 from circuit_params import C, R, Rg, U0_CASE1, U0_CASE2
 
 # ==================== 时间参数 ====================
-# 时间范围：0 到 200 微秒
+# 时间范围：0 到 200 毫秒
 T_START = 0.0
-T_END = 200e-6  # 200 微秒 = 0.0002 秒
-DT = 1e-6  # 采样间隔：1 微秒 = 0.000001 秒
+T_END = 200e-3  # 200 毫秒 = 0.2 秒
+DT = 10e-6  # 采样间隔：10 微秒 = 0.00001 秒
 
 
 def stage1_ode(t: float, u_c: np.ndarray) -> np.ndarray:
@@ -109,15 +110,50 @@ def stage1_ode(t: float, u_c: np.ndarray) -> np.ndarray:
     return np.array([du_dt])  # 返回数组，形状与 y0 一致
 
 
+def u_c_threshold_event(t: float, u_c: np.ndarray) -> float:
+    """
+    事件函数：当 |u_C| >= 800V 时触发事件，停止仿真
+    
+    参数：
+        t: 时间（秒）
+        u_c: 电容电压 u_C（作为状态变量 y[0] 传入，可能是数组或列表）
+    
+    返回：
+        返回值 = |u_C| - 800.0
+        - 当 |u_C| < 800 时，返回值 < 0（负值）
+        - 当 |u_C| >= 800 时，返回值 >= 0（非负值）
+    
+    事件触发机制：
+        solve_ivp检测函数值的符号变化（从负到正），而不是精确等于0
+        - 当返回值从负值变为非负值时，触发事件
+        - 不需要返回值精确等于0，避免了浮点数精度问题
+        - 这确保了当 |u_C| 从小于800变为大于等于800时，一定会触发事件
+    """
+    # 正确处理u_c的类型：可能是numpy数组、列表或标量
+    if isinstance(u_c, (np.ndarray, list)):
+        u_c_val = float(u_c[0])
+    else:
+        u_c_val = float(u_c)
+    
+    # 返回 |u_C| - 800.0
+    # solve_ivp会检测这个值从负到正的符号变化，触发事件
+    # 不需要精确等于0，只要符号从负变为非负即可
+    return abs(u_c_val) - 800.0
+
+
+u_c_threshold_event.terminal = True  # 事件触发时终止仿真
+u_c_threshold_event.direction = 1  # 只检测从负到正的穿越（|u_C|从小于800变为大于等于800）
+
+
 def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
                     method: str = 'Radau', rtol: float = 1e-8, atol: float = 1e-10) -> tuple[np.ndarray, np.ndarray, dict]:
     """
-    仿真 Stage 1（0-200微秒）的电路响应
+    仿真 Stage 1（0-200毫秒）的电路响应
     
     参数：
         u0: 初始电容电压（V）
-        t_end: 仿真结束时间（秒），默认200微秒
-        dt: 采样间隔（秒），默认1微秒
+        t_end: 仿真结束时间（秒），默认200毫秒
+        dt: 采样间隔（秒），默认10微秒
         method: 求解器方法，可选：
             - 'Radau': 隐式方法（默认，适合刚性问题）
             - 'RK45': 4-5阶Runge-Kutta（适合非刚性问题）
@@ -131,11 +167,15 @@ def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
         t: 时间数组（秒）
         u_c: 电容电压数组（V）
         results: 字典，包含各支路电流和电压
+    
+    注意：
+        - 当 |u_C| > 800V 时，仿真会自动停止（事件检测）
+        - 如果未触发事件，仿真会持续到 t_end
     """
-    # 时间采样点
+    # 时间采样点（最多到t_end，但可能因事件提前结束）
     t_eval = np.arange(T_START, t_end + dt / 2, dt)
     
-    # 求解ODE
+    # 求解ODE，添加事件检测
     sol = solve_ivp(
         fun=stage1_ode,
         t_span=(T_START, t_end),
@@ -143,7 +183,8 @@ def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
         t_eval=t_eval,
         method=method,
         rtol=rtol,
-        atol=atol
+        atol=atol,
+        events=u_c_threshold_event  # 添加事件检测
     )
     
     # solve_ivp 返回值说明：
@@ -163,6 +204,11 @@ def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
     # - sol.y 形状为 (2, m)
     # - sol.y[0] 是 u_C 的时间序列
     # - sol.y[1] 是 i_L 的时间序列
+    # 检查是否因事件提前终止
+    if sol.t_events and len(sol.t_events[0]) > 0:
+        event_time = sol.t_events[0][0]
+        print(f"注意: 仿真在 t = {event_time*1000:.6f} ms 时因 |u_C| > 800V 而提前终止")
+    
     t = sol.t
     u_c = sol.y[0]  # 提取第一个（也是唯一的）状态变量 u_C 的时间序列
     

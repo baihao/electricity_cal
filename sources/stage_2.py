@@ -111,7 +111,7 @@ from pathlib import Path
 from source import neutral_current
 from graph import plot_circuit_results
 from serialize import save_results_to_csv
-from reader import get_stage1_final_values
+from reader import get_stage1_final_values, get_stage1_final_time_and_u_c
 from circuit_params import (
     C, R, Rg, L,
     U_D1_THRESHOLD, U_D2_THRESHOLD, U_SCR_THRESHOLD,
@@ -121,8 +121,8 @@ from circuit_params import (
 )
 
 # ==================== 时间参数 ====================
-# 时间范围：200微秒到50毫秒
-T_START = 200e-6  # 200 微秒 = 0.0002 秒
+# 时间范围：从Stage 1结束时间到50毫秒
+# T_START 将从Stage 1的CSV文件中读取（动态设置）
 T_END = 50e-3  # 50 毫秒 = 0.05 秒
 DT = 10e-6  # 采样间隔：10 微秒 = 0.00001 秒
 
@@ -318,16 +318,16 @@ def stage2_ode(t: float, y: np.ndarray) -> np.ndarray:
     return np.array([du_c_dt, di_l_dt])
 
 
-def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float = T_START, 
+def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None, 
                     t_end: float = T_END, dt: float = DT, method: str = 'Radau', 
                     rtol: float = 1e-8, atol: float = 1e-10) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """
-    仿真 Stage 2（200微秒-50毫秒）的电路响应
+    仿真 Stage 2（从Stage 1结束时间到50毫秒）的电路响应
     
     参数：
         u0: 初始电容电压（V），从Stage 1的最终值继承
         i_l0: 初始电感电流（A），默认0
-        t_start: 仿真开始时间（秒），默认200微秒
+        t_start: 仿真开始时间（秒），如果为None则从Stage 1的CSV文件读取
         t_end: 仿真结束时间（秒），默认50毫秒
         dt: 采样间隔（秒），默认10微秒
         method: 求解器方法
@@ -340,6 +340,17 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float = T_START,
         i_l: 电感电流数组（A）
         results: 字典，包含各支路电流和电压
     """
+    # 如果t_start为None，尝试从Stage 1的CSV文件读取
+    if t_start is None:
+        try:
+            results_dir = Path(__file__).parent.parent / "results"
+            t_start, _ = get_stage1_final_time_and_u_c(u0, results_dir)
+            print(f"从Stage 1 CSV文件读取开始时间: t_start = {t_start*1000:.6f} ms")
+        except (FileNotFoundError, KeyError) as e:
+            print(f"警告: 无法从Stage 1 CSV文件读取开始时间: {e}")
+            print(f"使用默认值: t_start = 200e-6 (200微秒)")
+            t_start = 200e-6
+    
     # 时间采样点
     t_eval = np.arange(t_start, t_end + dt / 2, dt)
     
@@ -524,14 +535,18 @@ if __name__ == "__main__":
     # 情况1：初始电压为 0V（从Stage 1继承）
     stage1_u0_case1 = U0_CASE1
     try:
-        u_c_stage1_final, _ = get_stage1_final_values(stage1_u0_case1, results_dir)
-        print(f"从Stage 1 (u0={stage1_u0_case1}V) 继承: u_C(200µs) = {u_c_stage1_final:.6f} V")
+        t_stage1_end, u_c_stage1_final = get_stage1_final_time_and_u_c(stage1_u0_case1, results_dir)
+        print(f"从Stage 1 (u0={stage1_u0_case1}V) 继承:")
+        print(f"  结束时间: t = {t_stage1_end*1000:.6f} ms")
+        print(f"  u_C = {u_c_stage1_final:.6f} V")
         u0_case1 = u_c_stage1_final
+        t_start_case1 = t_stage1_end
     except FileNotFoundError:
-        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case1}V)，使用默认值 {U0_CASE1}V")
+        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case1}V)，使用默认值")
         u0_case1 = U0_CASE1
+        t_start_case1 = 200e-6  # 默认200微秒
     
-    t1, u_c1, i_l1, results1 = simulate_stage2(u0_case1)
+    t1, u_c1, i_l1, results1 = simulate_stage2(u0_case1, t_start=t_start_case1)
     print_summary(t1, u_c1, i_l1, results1, u0_case1)
     
     # 定义Stage 2的绘图配置
@@ -595,14 +610,18 @@ if __name__ == "__main__":
     # 情况2：初始电压为 750V（从Stage 1继承）
     stage1_u0_case2 = U0_CASE2
     try:
-        u_c_stage1_final, _ = get_stage1_final_values(stage1_u0_case2, results_dir)
-        print(f"\n从Stage 1 (u0={stage1_u0_case2}V) 继承: u_C(200µs) = {u_c_stage1_final:.6f} V")
+        t_stage1_end, u_c_stage1_final = get_stage1_final_time_and_u_c(stage1_u0_case2, results_dir)
+        print(f"\n从Stage 1 (u0={stage1_u0_case2}V) 继承:")
+        print(f"  结束时间: t = {t_stage1_end*1000:.6f} ms")
+        print(f"  u_C = {u_c_stage1_final:.6f} V")
         u0_case2 = u_c_stage1_final
+        t_start_case2 = t_stage1_end
     except FileNotFoundError:
-        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case2}V)，使用默认值 {U0_CASE2}V")
+        print(f"警告: 未找到Stage 1的结果文件 (u0={stage1_u0_case2}V)，使用默认值")
         u0_case2 = U0_CASE2
+        t_start_case2 = 200e-6  # 默认200微秒
     
-    t2, u_c2, i_l2, results2 = simulate_stage2(u0_case2)
+    t2, u_c2, i_l2, results2 = simulate_stage2(u0_case2, t_start=t_start_case2)
     print_summary(t2, u_c2, i_l2, results2, u0_case2)
     
     csv_path2 = results_dir / f"stage_2_results_u0_{stage1_u0_case2:.0f}V.csv"
