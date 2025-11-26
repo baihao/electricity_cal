@@ -112,7 +112,7 @@ def stage1_ode(t: float, u_c: np.ndarray) -> np.ndarray:
 
 def u_c_threshold_event(t: float, u_c: np.ndarray) -> float:
     """
-    事件函数：当 |u_C| >= 800V 时触发事件，停止仿真
+    事件函数：当 |u_C| >= 800V 时触发事件（不立即终止，继续仿真200微秒）
     
     参数：
         t: 时间（秒）
@@ -141,7 +141,7 @@ def u_c_threshold_event(t: float, u_c: np.ndarray) -> float:
     return abs(u_c_val) - 800.0
 
 
-u_c_threshold_event.terminal = True  # 事件触发时终止仿真
+u_c_threshold_event.terminal = False  # 事件触发时不立即终止，继续仿真
 u_c_threshold_event.direction = 1  # 只检测从负到正的穿越（|u_C|从小于800变为大于等于800）
 
 
@@ -169,13 +169,14 @@ def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
         results: 字典，包含各支路电流和电压
     
     注意：
-        - 当 |u_C| > 800V 时，仿真会自动停止（事件检测）
+        - 当 |u_C| >= 800V 时，会触发事件但不立即停止
+        - 继续仿真200微秒后停止
         - 如果未触发事件，仿真会持续到 t_end
     """
-    # 时间采样点（最多到t_end，但可能因事件提前结束）
+    # 时间采样点（最多到t_end）
     t_eval = np.arange(T_START, t_end + dt / 2, dt)
     
-    # 求解ODE，添加事件检测
+    # 第一次求解：检测事件
     sol = solve_ivp(
         fun=stage1_ode,
         t_span=(T_START, t_end),
@@ -184,7 +185,7 @@ def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
         method=method,
         rtol=rtol,
         atol=atol,
-        events=u_c_threshold_event  # 添加事件检测
+        events=u_c_threshold_event  # 添加事件检测（不终止）
     )
     
     # solve_ivp 返回值说明：
@@ -204,13 +205,65 @@ def simulate_stage1(u0: float, t_end: float = T_END, dt: float = DT,
     # - sol.y 形状为 (2, m)
     # - sol.y[0] 是 u_C 的时间序列
     # - sol.y[1] 是 i_L 的时间序列
-    # 检查是否因事件提前终止
+    
+    # 检查是否触发事件
+    event_time = None
     if sol.t_events and len(sol.t_events[0]) > 0:
         event_time = sol.t_events[0][0]
-        print(f"注意: 仿真在 t = {event_time*1000:.6f} ms 时因 |u_C| > 800V 而提前终止")
-    
-    t = sol.t
-    u_c = sol.y[0]  # 提取第一个（也是唯一的）状态变量 u_C 的时间序列
+        print(f"检测到事件: 在 t = {event_time*1000:.6f} ms 时 |u_C| >= 800V")
+        
+        # 计算新的结束时间：事件时间 + 200微秒
+        CONTINUE_TIME = 200e-6  # 200微秒 = 0.0002秒
+        new_t_end = event_time + CONTINUE_TIME
+        
+        # 如果新的结束时间不超过原来的t_end，则继续仿真
+        if new_t_end <= t_end:
+            print(f"继续仿真200微秒，新的结束时间: t = {new_t_end*1000:.6f} ms")
+            
+            # 获取事件时刻的状态值（使用插值，因为事件时间可能不在sol.t中）
+            y_at_event = np.array([np.interp(event_time, sol.t, sol.y[0])])
+            
+            # 继续仿真：从事件时间到新结束时间
+            # 从事件时间+dt开始，到new_t_end结束，确保总共200微秒
+            t_eval_continue = np.arange(event_time + dt, new_t_end + dt / 2, dt)
+            t_eval_continue = t_eval_continue[t_eval_continue <= new_t_end]
+            
+            sol_continue = solve_ivp(
+                fun=stage1_ode,
+                t_span=(event_time, new_t_end),
+                y0=y_at_event,
+                t_eval=t_eval_continue,
+                method=method,
+                rtol=rtol,
+                atol=atol
+            )
+            
+            # 合并结果：事件之前的时间点和继续仿真的时间点
+            # 截取事件时间之前的数据（不包括事件时间点）
+            t_before_event = sol.t[sol.t < event_time]
+            # 添加事件时间点（使用插值）
+            u_c_at_event = np.array([np.interp(event_time, sol.t, sol.y[0])])
+            
+            # 继续仿真的时间点（从事件时间+dt开始）
+            t_after_event = sol_continue.t
+            u_c_after = sol_continue.y[0]
+            
+            # 合并时间数组和状态变量
+            t = np.concatenate([t_before_event, [event_time], t_after_event])
+            u_c_before = sol.y[0][sol.t < event_time]
+            u_c = np.concatenate([u_c_before, u_c_at_event, u_c_after])
+            
+            print(f"仿真完成: 最终时间 t = {t[-1]*1000:.6f} ms，u_C = {u_c[-1]:.6f} V")
+        else:
+            # 如果新结束时间超过原来的t_end，使用原来的结果
+            print(f"注意: 事件时间 + 200微秒 ({new_t_end*1000:.6f} ms) 超过原定结束时间 ({t_end*1000:.6f} ms)")
+            print(f"使用原定结束时间的结果")
+            t = sol.t
+            u_c = sol.y[0]
+    else:
+        # 未触发事件，使用原始结果
+        t = sol.t
+        u_c = sol.y[0]  # 提取第一个（也是唯一的）状态变量 u_C 的时间序列
     
     # 计算各支路电流
     i_s = neutral_current(t)  # 电流源电流

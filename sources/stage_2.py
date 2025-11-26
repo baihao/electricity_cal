@@ -351,8 +351,9 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
             print(f"使用默认值: t_start = 200e-6 (200微秒)")
             t_start = 200e-6
     
-    # 时间采样点
+    # 时间采样点（确保不超过t_end）
     t_eval = np.arange(t_start, t_end + dt / 2, dt)
+    t_eval = t_eval[t_eval <= t_end]  # 确保所有值都在t_span范围内
     
     # 求解ODE
     sol = solve_ivp(
