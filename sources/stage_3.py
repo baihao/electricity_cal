@@ -284,6 +284,29 @@ def simulate_stage3(u0: float, i_l0: float = 0.0, t_start: float = T_START,
     u_rg = i_rg * Rg  # Rg两端电压
     u_s = u_c + u_rg  # 电流源两端电压（由KVL：u_s = u_C + u_Rg）
     
+    # 计算电感电压 u_L
+    # 从ODE函数中推导：u_C = u_bridge + u_L
+    # u_L = sign(i_L) · L · di_L/dt（考虑L的接法）
+    # 需要计算 di_L/dt
+    scr_off_mask = np.abs(i_l) < I_SCR_OFF_THRESHOLD
+    
+    # 计算整流桥电压（向量化）
+    sign_i_smooth = np.tanh(i_l / 1e-6)
+    u_bridge = sign_i_smooth * U_BYPASS_THRESHOLD + R_BYPASS_TOTAL * i_l
+    
+    # 计算 di_L/dt
+    di_l_dt = np.zeros_like(i_l)
+    # 当L回路导通时
+    di_l_dt[~scr_off_mask] = (u_c[~scr_off_mask] - u_bridge[~scr_off_mask]) / L
+    # 当L回路断开时
+    small_current_mask = scr_off_mask & (np.abs(i_l) < 1e-6)
+    di_l_dt[small_current_mask] = 0.0
+    tau_l_fast = 1e-6
+    di_l_dt[scr_off_mask & ~small_current_mask] = -i_l[scr_off_mask & ~small_current_mask] / tau_l_fast
+    
+    # 计算u_L：考虑L的接法（当i_L < 0时L反接）
+    u_l = sign_i_smooth * L * di_l_dt
+    
     # 由于K3短接（R_K3很小），u_C会快速衰减到接近0
     # 所以u_s ≈ u_Rg
     
@@ -295,6 +318,7 @@ def simulate_stage3(u0: float, i_l0: float = 0.0, t_start: float = T_START,
         'i_c': i_c,
         'i_rg': i_rg,
         'u_c': u_c,
+        'u_l': u_l,  # 电感两端电压
         'u_k3': u_k3,  # K3两端电压（等于u_C）
         'u_rg': u_rg,
         'u_s': u_s,

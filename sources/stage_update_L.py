@@ -69,34 +69,32 @@ def run_simulation_with_L(L_value: float) -> dict:
         print(f"\n运行 Stage 2...")
         u_c_stage1_final = u_c1[-1]
         t_stage1_end = t1[-1]
-        t2, u_c2, i_bypass2, results2 = stage_2.simulate_stage2(
+        t2, u_c2, i_l2, results2 = stage_2.simulate_stage2(
             u_c_stage1_final, 
-            i_bypass0=0.0, 
+            i_l0=0.0, 
             t_start=t_stage1_end
         )
         
         # Stage 2 提取最大值
-        # i_L = |i_bypass|，恒为正
-        i_l2 = np.abs(i_bypass2)
+        # i_L 恒为正（因为L在整流桥内部）
         results['stage2'] = {
             'max_u_C': np.max(np.abs(u_c2)),
             'max_u_L': np.max(np.abs(results2['u_l'])),
             'max_i_C': np.max(np.abs(results2['i_c'])),
-            'max_i_L': np.max(i_l2),
+            'max_i_L': np.max(np.abs(i_l2)),
         }
         
         # Stage 3 仿真（从Stage 2继承初始条件）
         print(f"\n运行 Stage 3...")
         u_c_stage2_final = u_c2[-1]
-        i_bypass_stage2_final = i_bypass2[-1]
-        t3, u_c3, i_bypass3, results3 = stage_3.simulate_stage3(
+        i_l_stage2_final = i_l2[-1]
+        t3, u_c3, i_l3, results3 = stage_3.simulate_stage3(
             u_c_stage2_final,
-            i_bypass_stage2_final
+            i_l0=i_l_stage2_final
         )
         
         # Stage 3 提取最大值
-        # i_L = |i_bypass|，恒为正
-        i_l3 = np.abs(i_bypass3)
+        # i_L 恒为正（因为L在整流桥内部）
         results['stage3'] = {
             'max_u_C': np.max(np.abs(u_c3)),
             'max_u_L': np.max(np.abs(results3['u_l'])),
@@ -157,7 +155,6 @@ def plot_results(L_values: np.ndarray, all_results: list[dict], output_dir: Path
     ax1 = axes[0, 0]
     ax1.plot(L_values, stage1_u_C, 'o-', label='Stage 1', linewidth=2, markersize=6)
     ax1.plot(L_values, stage2_u_C, 's-', label='Stage 2', linewidth=2, markersize=6)
-    ax1.plot(L_values, stage3_u_C, '^-', label='Stage 3', linewidth=2, markersize=6)
     ax1.set_xlabel('L (µH)', fontsize=12)
     ax1.set_ylabel('max|u_C| (V)', fontsize=12)
     ax1.set_title('电容电压最大值', fontsize=13, fontweight='bold')
@@ -167,7 +164,6 @@ def plot_results(L_values: np.ndarray, all_results: list[dict], output_dir: Path
     # 子图2：u_L最大值
     ax2 = axes[0, 1]
     ax2.plot(L_values, stage2_u_L, 's-', label='Stage 2', linewidth=2, markersize=6, color='orange')
-    ax2.plot(L_values, stage3_u_L, '^-', label='Stage 3', linewidth=2, markersize=6, color='green')
     ax2.set_xlabel('L (µH)', fontsize=12)
     ax2.set_ylabel('max|u_L| (V)', fontsize=12)
     ax2.set_title('电感电压最大值', fontsize=13, fontweight='bold')
@@ -178,7 +174,6 @@ def plot_results(L_values: np.ndarray, all_results: list[dict], output_dir: Path
     ax3 = axes[1, 0]
     ax3.plot(L_values, stage1_i_C, 'o-', label='Stage 1', linewidth=2, markersize=6)
     ax3.plot(L_values, stage2_i_C, 's-', label='Stage 2', linewidth=2, markersize=6)
-    ax3.plot(L_values, stage3_i_C, '^-', label='Stage 3', linewidth=2, markersize=6)
     ax3.set_xlabel('L (µH)', fontsize=12)
     ax3.set_ylabel('max|i_C| (A)', fontsize=12)
     ax3.set_title('电容电流最大值', fontsize=13, fontweight='bold')
@@ -188,7 +183,6 @@ def plot_results(L_values: np.ndarray, all_results: list[dict], output_dir: Path
     # 子图4：i_L最大值
     ax4 = axes[1, 1]
     ax4.plot(L_values, stage2_i_L, 's-', label='Stage 2', linewidth=2, markersize=6, color='orange')
-    ax4.plot(L_values, stage3_i_L, '^-', label='Stage 3', linewidth=2, markersize=6, color='green')
     ax4.set_xlabel('L (µH)', fontsize=12)
     ax4.set_ylabel('max|i_L| (A)', fontsize=12)
     ax4.set_title('电感电流最大值', fontsize=13, fontweight='bold')
