@@ -4,17 +4,18 @@ Stage 2: 200微秒-50毫秒电路仿真
 拓扑说明：
 - 电流源 i_s(t) 注入
 - 电流分流到三个并联支路：
-  1. L-整流桥支路（电感L和整流桥串联）
+  1. 整流桥+L支路（L在整流桥内部，与SCR串联）
   2. R支路（电阻R）
   3. C支路（电容C）
 - 这些支路汇合后流过Rg
-- 拓扑：电流源 → [L-整流桥 | R | C] → Rg → 地
+- 拓扑：电流源 → [整流桥(L在内部) | R | C] → Rg → 地
 
-整流桥电路：
-- 包含4个二极管（D1, D2, D3, D4）和1个可控硅（SCR1）
-- 当 i_L > 0 时：电流路径为 L → D1 → SCR1 → D2
-- 当 i_L < 0 时：电流路径为 L → D3（反接）→ SCR1（反接）→ D4（反接）
-- 整流桥实现全波整流，无论电流方向如何都能导通
+整流桥电路（L在内部）：
+- 包含4个二极管（D1, D2, D3, D4）、1个可控硅（SCR1）和1个电感（L）
+- L在整流桥内部，与SCR串联
+- 当 i_bypass > 0 时：电流路径为 电流源 → D1 → SCR1 → L → D2 → Rg → GND
+- 当 i_bypass < 0 时：电流路径为 GND → Rg → D4(反接) → SCR1(反接) → D3(反接) → L(反接) → 电流源
+- 整流桥实现全波整流，L的电流 i_L = |i_bypass| 恒为正
 
 电路参数：
 - C = 36 mF = 0.036 F
@@ -28,78 +29,77 @@ Stage 2: 200微秒-50毫秒电路仿真
 
 计算方法：
 1. 状态变量选择：
-   - u_C：电容电压（也是R两端电压，以及L-D1-D2-SCR1支路总电压）
-   - i_L：电感电流（也是L-D1-D2-SCR1支路电流，因为串联）
+   - u_C：电容电压（也是R两端电压，以及整流桥+L支路总电压）
+   - i_bypass：整流桥+L支路电流（可正可负）
+   - i_L：L的电流（恒为正，i_L = |i_bypass|，因为L在整流桥内部）
 
 2. KCL方程（在电流源节点）：
-   i_s(t) = i_L + i_R + i_C
+   i_s(t) = i_bypass + i_R + i_C
    其中：
-   - i_L：电感电流（也是L-D1-D2-SCR1支路电流，因为串联）
+   - i_bypass：整流桥+L支路电流（可正可负）
    - i_R = u_C / R：电阻电流
    - i_C = C · du_C/dt：电容电流
 
-3. KVL方程（L-整流桥支路）：
-   由于L和整流桥串联，且与R、C并联：
-   u_C = u_L + u_bypass
-   其中：
-   - u_L = L · di_L/dt：电感两端电压
-   - u_bypass：整流桥两端电压（根据电流方向计算）
+3. KVL方程（整流桥+L支路）：
+   由于整流桥+L支路与R、C并联：
+   u_bypass = u_C
    
-   整流桥的伏安特性（考虑电流方向）：
-   - 当 i_L > 0 时：电流路径为 L → D1(正接) → SCR1(正接) → D2(正接) → 电流源
-     正接：L接D的正极，D的负极接另一端
-     u_bypass = U(D1) + U(SCR1) + U(D2)
-              = (0.75 + 0.00007*i_L) + (0.88 + 0.000052*i_L) + (0.75 + 0.00007*i_L)
-              = 2.38 + 0.000192*i_L
+   整流桥+L支路内部KVL（考虑L在整流桥内部）：
+   - 当 i_bypass > 0 时：电流路径为 电流源 → D1 → SCR1 → L → D2 → Rg → GND
+     u_C = U(D1) + U(SCR1) + U(L) + U(D2)
+         = (0.75 + 0.00007*i_bypass) + (0.88 + 0.000052*i_bypass) 
+           + L·di_bypass/dt + (0.75 + 0.00007*i_bypass)
+         = 2.38 + 0.000192*i_bypass + L·di_bypass/dt
+     其中 i_L = i_bypass > 0（L的电流恒为正）
    
-   - 当 i_L < 0 时：电流路径为 GND → Rg → D4(反接) → SCR1(反接) → D3(反接) → L → 电流源
-     反接：L接D的负极，D的正极接另一端
-     因为 i_L < 0，电流从GND流向电流源（通过整流桥），所以D4、SCR1、D3需要反接才能导通
-     由于电流方向相反，整流桥的电压降方向也相反，u_bypass为负值：
-     u_bypass = -[U(D4) + U(SCR1) + U(D3)]
-              = -[(0.75 + 0.00007*|i_L|) + (0.88 + 0.000052*|i_L|) + (0.75 + 0.00007*|i_L|)]
-              = -(2.38 + 0.000192*|i_L|)
-              = -2.38 - 0.000192*|i_L|
-              = -2.38 + 0.000192*i_L  （因为 i_L < 0，所以 |i_L| = -i_L，因此 -|i_L| = i_L）
-     注意：u_bypass为负值，表示电压降方向与i_L > 0时相反
+   - 当 i_bypass < 0 时：电流路径为 GND → Rg → D4(反接) → SCR1(反接) → D3(反接) → L(反接) → 电流源
+     u_C = -[U(D4) + U(SCR1) + U(L) + U(D3)]
+         = -[(0.75 + 0.00007*|i_bypass|) + (0.88 + 0.000052*|i_bypass|)
+           + L·d|i_bypass|/dt + (0.75 + 0.00007*|i_bypass|)]
+         = -[2.38 + 0.000192*|i_bypass| + L·d|i_bypass|/dt]
+         = -2.38 - 0.000192*|i_bypass| - L·d|i_bypass|/dt
+     由于 i_L = |i_bypass| = -i_bypass > 0，所以：
+     d|i_bypass|/dt = d(-i_bypass)/dt = -di_bypass/dt
+     因此：u_C = -2.38 - 0.000192*|i_bypass| + L·di_bypass/dt
+              = -2.38 + 0.000192*i_bypass + L·di_bypass/dt
+     其中 i_L = |i_bypass| = -i_bypass > 0（L的电流恒为正）
    
-   - 统一表达式：u_bypass = sign(i_L) * 2.38 + 0.000192 * i_L
+   - 统一表达式：u_C = sign(i_bypass) · 2.38 + 0.000192·i_bypass + L·di_bypass/dt
    
-   因此：u_C = L · di_L/dt + u_bypass
-   整理得到：di_L/dt = (u_C - u_bypass) / L
+   整理得到：L·di_bypass/dt = u_C - sign(i_bypass)·2.38 - 0.000192·i_bypass
+   因此：di_bypass/dt = (u_C - sign(i_bypass)·2.38 - 0.000192·i_bypass) / L
 
 4. 电容支路方程：
-   i_C = C · du_C/dt = i_s - i_L - i_R
-   因此：du_C/dt = (i_s - i_L - u_C/R) / C
+   i_C = C · du_C/dt = i_s - i_bypass - i_R
+   因此：du_C/dt = (i_s - i_bypass - u_C/R) / C
 
-5. 状态方程（考虑整流桥的电流方向）：
-   du_C/dt = (i_s(t) - i_L - u_C/R) / C
-   di_L/dt = (u_C - u_bypass) / L
-   其中 u_bypass 根据 i_L 的方向计算：
-   - i_L > 0：u_bypass = 2.38 + 0.000192*i_L（D1-D2-SCR1路径）
-   - i_L < 0：u_bypass = -2.38 + 0.000192*i_L（D3-D4-SCR1路径）
-   - i_L = 0：u_bypass = 0
+5. 状态方程（最终形式）：
+   du_C/dt = (i_s(t) - i_bypass - u_C/R) / C
+   di_bypass/dt = (u_C - sign(i_bypass)·2.38 - 0.000192·i_bypass) / L
+   其中：
+   - i_bypass：整流桥+L支路电流（可正可负）
+   - i_L = |i_bypass|：L的电流（恒为正）
 
 6. Rg支路：
    i_Rg = i_s（由KCL）
    u_Rg = i_Rg · Rg = i_s · Rg
 
 7. 各支路电压：
-   - u_C：C两端电压（也是R两端电压，以及L-整流桥支路总电压）
-   - u_bypass：整流桥两端电压（根据电流方向计算）
-     * i_L > 0：u_bypass = 2.38 + 0.000192*i_L（D1-D2-SCR1路径）
-     * i_L < 0：u_bypass = -2.38 + 0.000192*i_L（D3-D4-SCR1路径）
-     * i_L = 0：u_bypass = 0
-   - u_L = u_C - u_bypass：电感两端电压
+   - u_C：C两端电压（也是R两端电压，以及整流桥+L支路总电压）
+   - u_bypass = u_C：整流桥+L支路总电压（因为并联）
+   - u_L：电感两端电压
+     * 当 i_bypass > 0 时：L正向接，u_L = L·di_bypass/dt
+     * 当 i_bypass < 0 时：L反接，u_L的参考方向相反，u_L = -L·di_bypass/dt
+     * 统一表达式：u_L = sign(i_bypass) · L · di_bypass/dt
    - u_Rg：Rg两端电压
    - u_s = u_C + u_Rg：电流源两端电压（由KVL）
 
 注意：
-- 由于L和整流桥串联，它们的电流相同（i_L = i_bypass）
-- 整流桥实现全波整流：无论电流方向如何，都能保证电流单向通过
-- 当 i_L > 0 时，使用 D1-D2-SCR1 路径
-- 当 i_L < 0 时，使用 D3-D4-SCR1 路径（反接）
-- 整流桥的电压降方向与电流方向一致
+- L在整流桥内部，与SCR串联
+- i_bypass：整流桥+L支路的总电流（可正可负）
+- i_L = |i_bypass|：L的电流（恒为正，因为L在整流桥内部）
+- u_bypass = u_C：因为整流桥+L支路与R、C并联
+- 整流桥实现全波整流，保证L的电流恒为正
 """
 
 from __future__ import annotations
@@ -184,51 +184,57 @@ def scr_voltage(i: float) -> float:
         return np.nan  # 不导通，电压未定义
 
 
-def rectifier_bridge_voltage(i_l: float, epsilon: float = 1e-6) -> float:
+def rectifier_bridge_voltage_only(i_bypass: float, epsilon: float = 1e-6) -> float:
     """
-    计算整流桥（D1-D4 + SCR1）的电压，考虑电流方向
+    计算整流桥部分（D1-D4 + SCR1，不包括L）的电压
     
-    整流桥的伏安特性（u_bypass定义为从L端到GND端的电压）：
-    - 当 i_L > 0 时：电流路径为 L → D1(正接) → SCR1(正接) → D2(正接) → 电流源
-      电流从L流向GND，u_bypass为正值：
-      u_bypass = 2.38 + 0.000192*i_L
+    注意：L在整流桥内部，与SCR串联。整流桥+L支路的总电压 u_bypass = u_C。
+    整流桥部分的电压 = u_C - u_L = u_C - L·di_bypass/dt
     
-    - 当 i_L < 0 时：电流路径为 GND → Rg → D4(反接) → SCR1(反接) → D3(反接) → L → 电流源
-      电流从GND流向L，u_bypass为负值（电压降方向相反）：
-      u_bypass = -2.38 + 0.000192*i_L
-      注意：当i_L < 0时，u_bypass为负值，因为电压降方向与i_L > 0时相反
+    整流桥的伏安特性（不包括L）：
+    - 当 i_bypass > 0 时：电流路径为 电流源 → D1 → SCR1 → L → D2 → Rg → GND
+      整流桥部分（D1+SCR1+D2）的电压：
+      u_bridge = U(D1) + U(SCR1) + U(D2)
+               = (0.75 + 0.00007*i_bypass) + (0.88 + 0.000052*i_bypass) + (0.75 + 0.00007*i_bypass)
+               = 2.38 + 0.000192*i_bypass
     
-    - 当 i_L = 0 时：u_bypass = 0
+    - 当 i_bypass < 0 时：电流路径为 GND → Rg → D4(反接) → SCR1(反接) → D3(反接) → L(反接) → 电流源
+      整流桥部分（D4+SCR1+D3）的电压（相对于i_bypass方向）：
+      u_bridge = -[U(D4) + U(SCR1) + U(D3)]
+               = -[(0.75 + 0.00007*|i_bypass|) + (0.88 + 0.000052*|i_bypass|) + (0.75 + 0.00007*|i_bypass|)]
+               = -(2.38 + 0.000192*|i_bypass|)
+               = -2.38 + 0.000192*i_bypass  （因为 i_bypass < 0，所以 |i_bypass| = -i_bypass）
     
-    统一表达式：u_bypass = sign(i_L) * U_threshold + R_total * i_L
+    - 统一表达式：u_bridge = sign(i_bypass) · U_threshold + R_total · i_bypass
     
-    使用平滑过渡函数避免在 i_L = 0 处的不连续性，提高数值稳定性。
+    使用平滑过渡函数避免在 i_bypass = 0 处的不连续性，提高数值稳定性。
     
     参数：
-        i_l: 通过整流桥的电流（A）
+        i_bypass: 整流桥+L支路电流（A），可正可负
         epsilon: 平滑过渡参数（默认1e-6），用于tanh函数
     
     返回：
-        整流桥两端电压（V），从L端到GND端
+        整流桥部分（不包括L）的电压（V）
     """
-    # 使用平滑的符号函数 tanh(i_L/epsilon) 代替 sign(i_L)
-    # 这样可以避免在 i_L = 0 处的不连续性
-    sign_i_smooth = np.tanh(i_l / epsilon)
+    # 使用平滑的符号函数 tanh(i_bypass/epsilon) 代替 sign(i_bypass)
+    sign_i_smooth = np.tanh(i_bypass / epsilon)
     
-    # 统一表达式：u_bypass = sign(i_L) * U_threshold + R_total * i_L
-    # 使用平滑的符号函数
-    u_bypass = sign_i_smooth * U_BYPASS_THRESHOLD + R_BYPASS_TOTAL * i_l
+    # 统一表达式：u_bridge = sign(i_bypass) · U_threshold + R_total · i_bypass
+    u_bridge = sign_i_smooth * U_BYPASS_THRESHOLD + R_BYPASS_TOTAL * i_bypass
     
-    return u_bypass
+    return u_bridge
 
 
 def calculate_individual_device_voltages(i_l: float, u_c: float) -> dict[str, float]:
     """
     计算各个器件的电压（D1, D2, D3, D4, SCR1）
     
+    注意：L在整流桥内部，与SCR串联。i_L恒为正。
+    路径判断在外层完成，此函数只计算导通器件的电压。
+    
     参数：
-        i_l: 通过整流桥的电流（A）
-        u_c: 电容电压（V），用于计算不导通二极管的反向电压（已不使用）
+        i_l: L的电流（A），恒为正（i_L = |i_bypass|）
+        u_c: 电容电压（V）
     
     返回：
         包含各个器件电压的字典：
@@ -239,63 +245,53 @@ def calculate_individual_device_voltages(i_l: float, u_c: float) -> dict[str, fl
         - 'u_scr1': SCR1的电压（V），定义为"从阳极到阴极"的电压降
     
     注意：
-        - 电压参考方向：从阳极到阴极（沿着正向电流方向）
-        - 正向导通路径（i_L > 0）：L → D1(正接) → SCR1(正接) → D2(正接) → 电流源
-          * D1、D2、SCR1导通，电压为正值（正向压降）
-          * D3、D4不导通，电压设为0（因为不导通的器件是串联拓扑，单个器件电压无意义）
-        - 反向导通路径（i_L < 0）：电流源 → D4(反接) → SCR1(反接) → D3(反接) → L
-          * D3、D4、SCR1导通，电压为正值（相对于负电流方向是正向）
-          * D1、D2不导通，电压设为0（因为不导通的器件是串联拓扑，单个器件电压无意义）
-        - 不导通的二极管和SCR是串联拓扑，单个器件的电压没有意义，因此设为0
+        - i_L恒为正，路径判断在外层根据i_bypass的方向完成
+        - 此函数只计算导通器件的电压，不导通的器件电压在外层设为0
     """
     if abs(i_l) < 1e-10:
         # i_L = 0时，所有器件都不导通，电压设为0
         return {
             'u_d1': 0.0, 'u_d2': 0.0, 'u_d3': 0.0, 'u_d4': 0.0, 
-            'u_scr1': 0.0  # SCR1不导通时电压为0
+            'u_scr1': 0.0
         }
     
-    if i_l > 0:
-        # 正向导通路径：L → D1(正接) → SCR1(正接) → D2(正接) → 电流源
-        u_d1 = diode_voltage(i_l, U_D1_THRESHOLD, R_D1)  # D1导通
-        u_scr1 = scr_voltage(i_l)  # SCR1导通
-        u_d2 = diode_voltage(i_l, U_D2_THRESHOLD, R_D2)  # D2导通
-        # D3和D4不导通，电压设为0（串联拓扑，单个器件电压无意义）
-        u_d3 = 0.0
-        u_d4 = 0.0
-    else:
-        # 反向导通路径：电流源 → D4(反接) → SCR1(反接) → D3(反接) → L
-        # 因为i_L < 0，电流从电流源流向L，D4、SCR1、D3反接才能导通
-        u_d4 = diode_voltage(-i_l, U_D2_THRESHOLD, R_D2)  # D4导通（反接，相对于负电流是正向）
-        u_scr1 = scr_voltage(-i_l)  # SCR1导通（反接，相对于负电流是正向）
-        u_d3 = diode_voltage(-i_l, U_D1_THRESHOLD, R_D1)  # D3导通（反接，相对于负电流是正向）
-        # D1和D2不导通，电压设为0（串联拓扑，单个器件电压无意义）
-        u_d1 = 0.0
-        u_d2 = 0.0
+    # i_L恒为正，计算器件电压（路径判断在外层完成）
+    u_d1 = diode_voltage(i_l, U_D1_THRESHOLD, R_D1)
+    u_d2 = diode_voltage(i_l, U_D2_THRESHOLD, R_D2)
+    u_d3 = diode_voltage(i_l, U_D1_THRESHOLD, R_D1)
+    u_d4 = diode_voltage(i_l, U_D2_THRESHOLD, R_D2)
+    u_scr1 = scr_voltage(i_l)
+    
+    # 处理NaN值
+    u_d1 = u_d1 if not np.isnan(u_d1) else 0.0
+    u_d2 = u_d2 if not np.isnan(u_d2) else 0.0
+    u_d3 = u_d3 if not np.isnan(u_d3) else 0.0
+    u_d4 = u_d4 if not np.isnan(u_d4) else 0.0
+    u_scr1 = u_scr1 if not np.isnan(u_scr1) else 0.0
     
     return {'u_d1': u_d1, 'u_d2': u_d2, 'u_d3': u_d3, 'u_d4': u_d4, 'u_scr1': u_scr1}
 
 
 def stage2_ode(t: float, y: np.ndarray) -> np.ndarray:
     """
-    状态方程，考虑整流桥的电流方向：
-        du_C/dt = (i_s(t) - i_L - u_C/R) / C
-        di_L/dt = (u_C - u_bypass) / L
+    状态方程（L在整流桥内部）：
+        du_C/dt = (i_s(t) - i_bypass - u_C/R) / C
+        di_bypass/dt = (u_C - sign(i_bypass)·2.38 - 0.000192·i_bypass) / L
     
-    其中 u_bypass 根据电流方向计算：
-    - 当 i_L > 0 时：u_bypass = 2.38 + 0.000192*i_L（D1-D2-SCR1路径）
-    - 当 i_L < 0 时：u_bypass = -2.38 + 0.000192*i_L（D3-D4-SCR1路径）
-    - 当 i_L = 0 时：u_bypass = 0
+    其中：
+    - i_bypass：整流桥+L支路电流（可正可负）
+    - i_L = |i_bypass|：L的电流（恒为正）
+    - u_bypass = u_C：因为整流桥+L支路与R、C并联
     
     参数：
         t: 时间（秒）
-        y: 状态变量数组 [u_C, i_L]
+        y: 状态变量数组 [u_C, i_bypass]
     
     返回：
-        [du_C/dt, di_L/dt]
+        [du_C/dt, di_bypass/dt]
     """
     u_c = y[0]
-    i_l = y[1]
+    i_bypass = y[1]
     
     # 电流源电流
     i_s = neutral_current(t)
@@ -303,22 +299,25 @@ def stage2_ode(t: float, y: np.ndarray) -> np.ndarray:
     # 电阻电流
     i_r = u_c / R
     
-    # 电容电压变化率（KCL：i_C = i_s - i_L - i_R）
-    du_c_dt = (i_s - i_l - i_r) / C
+    # 电容电压变化率（KCL：i_C = i_s - i_bypass - i_R）
+    du_c_dt = (i_s - i_bypass - i_r) / C
     
-    # 计算整流桥电压（考虑电流方向）
-    u_bypass = rectifier_bridge_voltage(i_l)
+    # 计算整流桥部分的电压（不包括L）
+    # u_C = u_bridge + u_L = u_bridge + L·di_bypass/dt
+    # 其中 u_bridge = sign(i_bypass)·2.38 + 0.000192·i_bypass
+    # 因此：L·di_bypass/dt = u_C - u_bridge
+    sign_i_smooth = np.tanh(i_bypass / 1e-6)  # 平滑符号函数
+    u_bridge = sign_i_smooth * U_BYPASS_THRESHOLD + R_BYPASS_TOTAL * i_bypass
     
-    # 电感电流变化率
-    # KVL: u_C = u_L + u_bypass
-    # u_L = L · di_L/dt
-    # 因此：di_L/dt = (u_C - u_bypass) / L
-    di_l_dt = (u_c - u_bypass) / L
+    # 整流桥+L支路电流变化率
+    # u_C = u_bridge + L·di_bypass/dt
+    # 因此：di_bypass/dt = (u_C - u_bridge) / L
+    di_bypass_dt = (u_c - u_bridge) / L
     
-    return np.array([du_c_dt, di_l_dt])
+    return np.array([du_c_dt, di_bypass_dt])
 
 
-def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None, 
+def simulate_stage2(u0: float, i_bypass0: float = 0.0, t_start: float | None = None, 
                     t_end: float = T_END, dt: float = DT, method: str = 'Radau', 
                     rtol: float = 1e-8, atol: float = 1e-10) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """
@@ -326,7 +325,7 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
     
     参数：
         u0: 初始电容电压（V），从Stage 1的最终值继承
-        i_l0: 初始电感电流（A），默认0
+        i_bypass0: 初始整流桥+L支路电流（A），默认0
         t_start: 仿真开始时间（秒），如果为None则从Stage 1的CSV文件读取
         t_end: 仿真结束时间（秒），默认50毫秒
         dt: 采样间隔（秒），默认10微秒
@@ -337,7 +336,7 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
     返回：
         t: 时间数组（秒）
         u_c: 电容电压数组（V）
-        i_l: 电感电流数组（A）
+        i_bypass: 整流桥+L支路电流数组（A，可正可负）
         results: 字典，包含各支路电流和电压
     """
     # 如果t_start为None，尝试从Stage 1的CSV文件读取
@@ -359,7 +358,7 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
     sol = solve_ivp(
         fun=stage2_ode,
         t_span=(t_start, t_end),
-        y0=[u0, i_l0],
+        y0=[u0, i_bypass0],
         t_eval=t_eval,
         method=method,
         rtol=rtol,
@@ -376,7 +375,8 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
     
     t = sol.t
     u_c = sol.y[0]
-    i_l = sol.y[1]
+    i_bypass = sol.y[1]  # 整流桥+L支路电流（可正可负）
+    i_l = np.abs(i_bypass)  # L的电流（恒为正）
     
     # 检查结果是否为空
     if len(t) == 0:
@@ -395,11 +395,11 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
     i_s = neutral_current(t)  # 电流源电流
     i_r = u_c / R  # 电阻电流
     
-    # L和D1-D2-SCR1串联，电流相同：i_L就是L-D1-D2-SCR1支路电流
-    i_bypass = i_l  # 电子旁路电流等于电感电流（串联）
+    # i_bypass：整流桥+L支路电流（可正可负）
+    # i_L：L的电流（恒为正，i_L = |i_bypass|）
     
-    # 电容电流（由KCL：i_C = i_s - i_L - i_R）
-    i_c = i_s - i_l - i_r
+    # 电容电流（由KCL：i_C = i_s - i_bypass - i_R）
+    i_c = i_s - i_bypass - i_r
     
     i_rg = i_s  # Rg电流（由KCL）
     
@@ -407,55 +407,85 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
     u_rg = i_rg * Rg  # Rg两端电压
     u_s = u_c + u_rg  # 电流源两端电压（由KVL）
     
-    # 计算电感电压和整流桥电压
-    # u_C = u_L + u_bypass（KVL）
-    # u_bypass 根据电流方向计算（考虑整流桥的电流方向）
-    # u_L = u_C - u_bypass
+    # 计算整流桥部分电压和电感电压
+    # u_C = u_bridge + u_L（KVL，因为整流桥+L支路与R、C并联）
+    # u_bridge = sign(i_bypass)·2.38 + 0.000192·i_bypass
+    # u_bypass = u_C（整流桥+L支路总电压）
     
-    u_bypass = np.array([rectifier_bridge_voltage(i) for i in i_l])  # 对每个时间点计算
-    u_l = u_c - u_bypass
+    # 计算di_bypass/dt（从ODE函数中推导）
+    sign_i_smooth = np.tanh(i_bypass / 1e-6)
+    u_bridge = sign_i_smooth * U_BYPASS_THRESHOLD + R_BYPASS_TOTAL * i_bypass
+    di_bypass_dt = (u_c - u_bridge) / L
+    
+    # 计算u_L：当i_bypass < 0时，L反接，u_L的参考方向相反
+    # 当 i_bypass > 0 时：L正向接，u_L = L·di_bypass/dt
+    # 当 i_bypass < 0 时：L反接，u_L = -L·di_bypass/dt（参考方向相反）
+    # 统一表达式：u_L = sign(i_bypass) · L · di_bypass/dt
+    u_l = sign_i_smooth * L * di_bypass_dt  # 电感两端电压（考虑L的接法）
+    u_bypass = u_c  # 整流桥+L支路总电压（因为并联）
     
     # 计算各个器件的电压和电流
-    # 正向导通路径（i_L > 0）：L → D1(正接) → SCR1(正接) → D2(正接) → 电流源
-    # 反向导通路径（i_L < 0）：电流源 → D4(反接) → SCR1(反接) → D3(反接) → L
-    i_d1 = np.where(i_l > 0, i_l, 0.0)  # D1只在i_L > 0时导通（正向路径）
-    i_d2 = np.where(i_l > 0, i_l, 0.0)  # D2只在i_L > 0时导通（正向路径）
-    i_d3 = np.where(i_l < 0, -i_l, 0.0)  # D3只在i_L < 0时导通（反向路径：D4-SCR1-D3）
-    i_d4 = np.where(i_l < 0, -i_l, 0.0)  # D4只在i_L < 0时导通（反向路径：D4-SCR1-D3）
-    i_scr1 = np.abs(i_l)  # SCR1在两种情况下都导通（相对于电流方向）
+    # 正向导通路径（i_bypass > 0）：电流源 → D1 → SCR1 → L → D2 → Rg → GND
+    # 反向导通路径（i_bypass < 0）：GND → Rg → D4(反接) → SCR1(反接) → D3(反接) → L(反接) → 电流源
+    # 注意：i_L = |i_bypass| 恒为正
+    i_d1 = np.where(i_bypass > 0, i_bypass, 0.0)  # D1只在i_bypass > 0时导通（正向路径）
+    i_d2 = np.where(i_bypass > 0, i_bypass, 0.0)  # D2只在i_bypass > 0时导通（正向路径）
+    i_d3 = np.where(i_bypass < 0, -i_bypass, 0.0)  # D3只在i_bypass < 0时导通（反向路径）
+    i_d4 = np.where(i_bypass < 0, -i_bypass, 0.0)  # D4只在i_bypass < 0时导通（反向路径）
+    i_scr1 = i_l  # SCR1的电流等于L的电流（恒为正，因为串联）
     
     # 计算各个器件的电压
     # 在整流桥中，不导通的二极管与导通路径并联，其电压等于u_C（反向电压）
-    u_d1 = np.zeros_like(i_l)
-    u_d2 = np.zeros_like(i_l)
-    u_d3 = np.zeros_like(i_l)
-    u_d4 = np.zeros_like(i_l)
-    u_scr1 = np.zeros_like(i_l)
+    u_d1 = np.zeros_like(i_bypass)
+    u_d2 = np.zeros_like(i_bypass)
+    u_d3 = np.zeros_like(i_bypass)
+    u_d4 = np.zeros_like(i_bypass)
+    u_scr1 = np.zeros_like(i_bypass)
     
-    for idx, i_val in enumerate(i_l):
+    for idx, i_bypass_val in enumerate(i_bypass):
+        # i_L = |i_bypass| 恒为正
+        i_l_val = abs(i_bypass_val)
         # 使用calculate_individual_device_voltages函数计算各个器件的电压
-        device_voltages = calculate_individual_device_voltages(i_val, u_c[idx])
-        u_d1[idx] = device_voltages['u_d1']
-        u_d2[idx] = device_voltages['u_d2']
-        u_d3[idx] = device_voltages['u_d3']
-        u_d4[idx] = device_voltages['u_d4']
-        u_scr1[idx] = device_voltages['u_scr1']
+        # 注意：这个函数需要i_L的值（恒为正），但我们需要根据i_bypass的方向来判断路径
+        if i_bypass_val > 0:
+            # 正向路径：D1 → SCR1 → L → D2
+            device_voltages = calculate_individual_device_voltages(i_l_val, u_c[idx])
+            u_d1[idx] = device_voltages['u_d1']
+            u_d2[idx] = device_voltages['u_d2']
+            u_scr1[idx] = device_voltages['u_scr1']
+            u_d3[idx] = 0.0
+            u_d4[idx] = 0.0
+        elif i_bypass_val < 0:
+            # 反向路径：D4(反接) → SCR1(反接) → D3(反接) → L(反接)
+            device_voltages = calculate_individual_device_voltages(-i_bypass_val, u_c[idx])
+            u_d3[idx] = device_voltages['u_d3']
+            u_d4[idx] = device_voltages['u_d4']
+            u_scr1[idx] = device_voltages['u_scr1']
+            u_d1[idx] = 0.0
+            u_d2[idx] = 0.0
+        else:
+            # i_bypass = 0
+            u_d1[idx] = 0.0
+            u_d2[idx] = 0.0
+            u_d3[idx] = 0.0
+            u_d4[idx] = 0.0
+            u_scr1[idx] = 0.0
     
     results = {
         'i_s': i_s,
-        'i_l': i_l,
+        'i_l': i_l,  # L的电流（恒为正，i_L = |i_bypass|）
+        'i_bypass': i_bypass,  # 整流桥+L支路电流（可正可负）
         'i_r': i_r,
         'i_c': i_c,
-        'i_bypass': i_bypass,  # 等于i_L（串联）
         'i_rg': i_rg,
-        'i_d1': i_d1,  # D1的电流（正向导通路径：D1-SCR1-D2）
-        'i_d2': i_d2,  # D2的电流（正向导通路径：D1-SCR1-D2）
-        'i_d3': i_d3,  # D3的电流（反向导通路径：D3-SCR1-D4）
-        'i_d4': i_d4,  # D4的电流（反向导通路径：D3-SCR1-D4）
-        'i_scr1': i_scr1,  # SCR1的电流
+        'i_d1': i_d1,  # D1的电流（正向导通路径：D1-SCR1-L-D2）
+        'i_d2': i_d2,  # D2的电流（正向导通路径：D1-SCR1-L-D2）
+        'i_d3': i_d3,  # D3的电流（反向导通路径：D4-SCR1-L-D3）
+        'i_d4': i_d4,  # D4的电流（反向导通路径：D4-SCR1-L-D3）
+        'i_scr1': i_scr1,  # SCR1的电流（等于i_L，恒为正）
         'u_c': u_c,
         'u_l': u_l,  # 电感两端电压
-        'u_bypass': u_bypass,  # 整流桥两端电压
+        'u_bypass': u_bypass,  # 整流桥+L支路总电压（等于u_C）
         'u_rg': u_rg,
         'u_s': u_s,
         'u_d1': u_d1,  # D1的电压
@@ -465,10 +495,10 @@ def simulate_stage2(u0: float, i_l0: float = 0.0, t_start: float | None = None,
         'u_scr1': u_scr1  # SCR1的电压
     }
     
-    return t, u_c, i_l, results
+    return t, u_c, i_bypass, results
 
 
-def print_summary(t: np.ndarray, u_c: np.ndarray, i_l: np.ndarray, results: dict, u0: float) -> None:
+def print_summary(t: np.ndarray, u_c: np.ndarray, i_bypass: np.ndarray, results: dict, u0: float) -> None:
     """
     打印仿真结果摘要
     """
@@ -479,28 +509,30 @@ def print_summary(t: np.ndarray, u_c: np.ndarray, i_l: np.ndarray, results: dict
     print(f"采样点数: {len(t)}")
     print(f"\n初始值:")
     print(f"  u_C(0) = {u_c[0]:.6f} V")
-    print(f"  i_L(0) = {i_l[0]:.6f} A")
+    print(f"  i_bypass(0) = {i_bypass[0]:.6f} A")
+    print(f"  i_L(0) = {results['i_l'][0]:.6f} A (恒为正)")
     print(f"  i_s(0) = {results['i_s'][0]:.6f} A")
     print(f"\n最终值（t = {t[-1]*1000:.3f} ms）:")
     print(f"  u_C = {u_c[-1]:.6f} V")
-    print(f"  i_L = {i_l[-1]:.6f} A")
+    print(f"  i_bypass = {i_bypass[-1]:.6f} A")
+    print(f"  i_L = {results['i_l'][-1]:.6f} A (恒为正)")
     print(f"  i_s = {results['i_s'][-1]:.6f} A")
     print(f"  i_R = {results['i_r'][-1]:.6f} A")
     print(f"  i_C = {results['i_c'][-1]:.6f} A")
-    print(f"  i_bypass = {results['i_bypass'][-1]:.6f} A")
     if 'i_d1' in results:
-        print(f"  i_D1 = {results['i_d1'][-1]:.6f} A (正向路径：D1-SCR1-D2)")
+        print(f"  i_D1 = {results['i_d1'][-1]:.6f} A (正向路径：D1-SCR1-L-D2)")
     if 'i_d2' in results:
-        print(f"  i_D2 = {results['i_d2'][-1]:.6f} A (正向路径：D1-SCR1-D2)")
+        print(f"  i_D2 = {results['i_d2'][-1]:.6f} A (正向路径：D1-SCR1-L-D2)")
     if 'i_d3' in results:
-        print(f"  i_D3 = {results['i_d3'][-1]:.6f} A (反向路径：D3-SCR1-D4)")
+        print(f"  i_D3 = {results['i_d3'][-1]:.6f} A (反向路径：D4-SCR1-L-D3)")
     if 'i_d4' in results:
-        print(f"  i_D4 = {results['i_d4'][-1]:.6f} A (反向路径：D3-SCR1-D4)")
+        print(f"  i_D4 = {results['i_d4'][-1]:.6f} A (反向路径：D4-SCR1-L-D3)")
     if 'i_scr1' in results:
-        print(f"  i_SCR1 = {results['i_scr1'][-1]:.6f} A")
+        print(f"  i_SCR1 = {results['i_scr1'][-1]:.6f} A (等于i_L，恒为正)")
     print(f"  i_Rg = {results['i_rg'][-1]:.6f} A")
     print(f"  u_s = {results['u_s'][-1]:.6f} V")
     print(f"  u_Rg = {results['u_rg'][-1]:.6f} V")
+    print(f"  u_bypass = {results['u_bypass'][-1]:.6f} V (等于u_C)")
     if 'u_d1' in results:
         print(f"  u_D1 = {results['u_d1'][-1]:.6f} V")
     if 'u_d2' in results:
@@ -512,13 +544,15 @@ def print_summary(t: np.ndarray, u_c: np.ndarray, i_l: np.ndarray, results: dict
     if 'u_scr1' in results:
         print(f"  u_SCR1 = {results['u_scr1'][-1]:.6f} V")
     print(f"\n验证（KCL）:")
-    print(f"  i_s = i_L + i_R + i_C:")
-    print(f"    {results['i_s'][-1]:.6f} ≈ {i_l[-1] + results['i_r'][-1] + results['i_c'][-1]:.6f}")
-    print(f"  误差: {abs(results['i_s'][-1] - (i_l[-1] + results['i_r'][-1] + results['i_c'][-1])):.6e} A")
+    print(f"  i_s = i_bypass + i_R + i_C:")
+    print(f"    {results['i_s'][-1]:.6f} ≈ {i_bypass[-1] + results['i_r'][-1] + results['i_c'][-1]:.6f}")
+    print(f"  误差: {abs(results['i_s'][-1] - (i_bypass[-1] + results['i_r'][-1] + results['i_c'][-1])):.6e} A")
     print(f"\n注意：")
-    print(f"  - i_bypass = i_L（L和整流桥串联，电流相同）")
-    print(f"  - 正向导通路径（i_L > 0）：L → D1(正接) → SCR1(正接) → D2(正接) → 电流源")
-    print(f"  - 反向导通路径（i_L < 0）：电流源 → D4(反接) → SCR1(反接) → D3(反接) → L")
+    print(f"  - i_bypass：整流桥+L支路电流（可正可负）")
+    print(f"  - i_L = |i_bypass|：L的电流（恒为正，因为L在整流桥内部）")
+    print(f"  - u_bypass = u_C：因为整流桥+L支路与R、C并联")
+    print(f"  - 正向导通路径（i_bypass > 0）：电流源 → D1 → SCR1 → L → D2 → Rg → GND")
+    print(f"  - 反向导通路径（i_bypass < 0）：GND → Rg → D4(反接) → SCR1(反接) → D3(反接) → L(反接) → 电流源")
     print(f"  - 不导通的二极管承受反向电压u_C（与导通路径并联）")
     print(f"{'='*60}\n")
 
@@ -547,8 +581,8 @@ if __name__ == "__main__":
         u0_case1 = U0_CASE1
         t_start_case1 = 200e-6  # 默认200微秒
     
-    t1, u_c1, i_l1, results1 = simulate_stage2(u0_case1, t_start=t_start_case1)
-    print_summary(t1, u_c1, i_l1, results1, u0_case1)
+    t1, u_c1, i_bypass1, results1 = simulate_stage2(u0_case1, t_start=t_start_case1)
+    print_summary(t1, u_c1, i_bypass1, results1, u0_case1)
     
     # 定义Stage 2的绘图配置
     stage2_components = [
@@ -622,8 +656,8 @@ if __name__ == "__main__":
         u0_case2 = U0_CASE2
         t_start_case2 = 200e-6  # 默认200微秒
     
-    t2, u_c2, i_l2, results2 = simulate_stage2(u0_case2, t_start=t_start_case2)
-    print_summary(t2, u_c2, i_l2, results2, u0_case2)
+    t2, u_c2, i_bypass2, results2 = simulate_stage2(u0_case2, t_start=t_start_case2)
+    print_summary(t2, u_c2, i_bypass2, results2, u0_case2)
     
     csv_path2 = results_dir / f"stage_2_results_u0_{stage1_u0_case2:.0f}V.csv"
     save_results_to_csv(t2, results2, 'Stage 2', stage1_u0_case2, filename=str(csv_path2))

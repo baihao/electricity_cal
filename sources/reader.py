@@ -115,21 +115,24 @@ def get_stage1_final_time_and_u_c(u0: float, results_dir: Path | None = None) ->
 
 def get_stage2_final_values(u0: float, results_dir: Path | None = None) -> tuple[float, float]:
     """
-    获取Stage 2的最终值（u_C和i_L）
+    获取Stage 2的最终值（u_C和i_bypass）
+    
+    注意：修改后，Stage 2的状态变量是i_bypass（可正可负），而不是i_L
     
     参数：
         u0: 初始电压（V）
         results_dir: results文件夹路径（可选）
     
     返回：
-        (u_C_final, i_L_final) 元组
+        (u_C_final, i_bypass_final) 元组
     """
     final_values = get_stage_final_values('Stage 2', u0, results_dir)
     
     u_c_final = final_values.get('u_C (V)', 0.0)
-    i_l_final = final_values.get('i_L (A)', 0.0)
+    # 优先读取i_bypass，如果没有则读取i_L（兼容旧格式）
+    i_bypass_final = final_values.get('i_bypass (A)', final_values.get('i_L (A)', 0.0))
     
-    return u_c_final, i_l_final
+    return u_c_final, i_bypass_final
 
 
 def print_final_values(stage_name: str, u0: float, results_dir: Path | None = None) -> None:
