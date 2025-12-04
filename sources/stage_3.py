@@ -3,11 +3,9 @@ Stage 3: 50毫秒-200毫秒电路仿真
 
 拓扑说明：
 - 在50ms时，K3闭合
-- K3闭合后，电路拓扑变为：K3 | (L + bypass) | R | C（四个支路并联）
-- 在L回路中，晶闸管因为电流过小而关闭之后，将不再开启
-- 当i_L < I_SCR_OFF_THRESHOLD时，(L + bypass)支路断开，拓扑变为：K3 | R | C（三个支路并联）
+- K3闭合后，电路拓扑变为：K3 | L | R | C（四个支路并联）
 - 大部分电流由K3接管
-- 拓扑：电流源 → [K3 | (L + bypass) | R | C] → Rg → 地
+- 拓扑：电流源 → [K3 | L | R | C] → Rg → 地
 - 由于K3电阻很小，各并联支路电压接近0
 
 电路参数：
@@ -23,41 +21,22 @@ Stage 3: 50毫秒-200毫秒电路仿真
    - i_L：电感电流（L回路被短接，会快速衰减到0）
 
 2. KCL方程（在电流源节点）：
-   根据电路拓扑 K3 | (L + bypass) | R | C（并联）：
-   
-   当L回路导通（|i_L| ≥ I_SCR_OFF_THRESHOLD）：
+   根据电路拓扑 K3 | L | R | C（并联）：
    i_s(t) = i_K3 + i_L + i_R + i_C
    其中：
    - i_K3 = u_C / R_K3：K3回路电流（由于K3与C并联，电压相同）
-   - i_L：电感电流（L + bypass支路电流）
+   - i_L：电感电流
    - i_R = u_C / R：电阻电流
    - i_C = C · du_C/dt：电容电流
-   
-   当L回路断开（|i_L| < I_SCR_OFF_THRESHOLD）：
-   i_s(t) = i_K3 + i_R + i_C
-   其中：
-   - i_K3 = u_C / R_K3：K3回路电流
-   - i_R = u_C / R：电阻电流
-   - i_C = C · du_C/dt：电容电流
-   - i_L：快速衰减到0（L回路断开，不再参与KCL）
    
    电感电流i_L的计算方式：
-   * 当晶闸管关闭（|i_L| < I_SCR_OFF_THRESHOLD）：
-     (L + bypass)支路断开，i_L通过L和R_K3的串联回路衰减
-     di_L/dt = -i_L / τ_L
-     其中 τ_L = L / R_K3 为L回路的衰减时间常数
-     解为：i_L(t) = i_L(0) · exp(-t/τ_L)，指数衰减到0
-   * 当晶闸管还导通（|i_L| ≥ I_SCR_OFF_THRESHOLD）：
-     KVL：(L + bypass)支路：u_C = u_L + u_bypass
-     其中 u_L = L · di_L/dt，u_bypass = rectifier_bridge_voltage(i_L)
-     因此：di_L/dt = (u_C - u_bypass) / L
-     由于K3短接，u_C快速衰减到接近0，u_bypass也接近0
-     所以i_L主要通过u_C的衰减而衰减
+   KVL：L支路与K3、R、C并联，所以 u_C = u_L = L · di_L/dt
+   因此：di_L/dt = u_C / L
+   由于K3短接，u_C快速衰减到接近0，所以i_L也快速衰减到0
 
 3. KVL方程（并联支路电压关系）：
-   由于K3、R、C、(L + bypass)并联，它们两端的电压相同：
-   - u_K3 = u_C = u_R = u_L + u_bypass（当L回路导通时）
-   - u_K3 = u_C = u_R（当L回路断开时）
+   由于K3、R、C、L并联，它们两端的电压相同：
+   - u_K3 = u_C = u_R = u_L
    - 由于R_K3很小，u_K3 = R_K3 · i_K3 ≈ 0（因为R_K3很小）
    - 所以u_C ≈ 0，各支路电压都接近0
 
@@ -72,23 +51,13 @@ Stage 3: 50毫秒-200毫秒电路仿真
 5. 状态方程：
    根据KCL和KVL推导：
    
-   当L回路导通（|i_L| ≥ I_SCR_OFF_THRESHOLD）：
    - KCL：i_s = i_K3 + i_L + i_R + i_C
      其中：i_K3 = u_C / R_K3, i_R = u_C / R, i_C = C · du_C/dt
      因此：i_s = u_C/R_K3 + i_L + u_C/R + C·du_C/dt
      整理得到：du_C/dt = (i_s - i_L - u_C/R - u_C/R_K3) / C
    
-   - KVL：(L + bypass)支路：u_C = u_L + u_bypass
-     其中：u_L = L · di_L/dt, u_bypass = rectifier_bridge_voltage(i_L)
-     因此：di_L/dt = (u_C - u_bypass) / L
-   
-   当L回路断开（|i_L| < I_SCR_OFF_THRESHOLD）：
-   - KCL：i_s = i_K3 + i_R + i_C
-     其中：i_K3 = u_C / R_K3, i_R = u_C / R, i_C = C · du_C/dt
-     因此：i_s = u_C/R_K3 + u_C/R + C·du_C/dt
-     整理得到：du_C/dt = (i_s - u_C/R - u_C/R_K3) / C
-   
-   - i_L衰减：di_L/dt = -i_L / (L / R_K3) = -i_L · R_K3 / L
+   - KVL：L支路与K3、R、C并联，所以 u_C = u_L = L · di_L/dt
+     因此：di_L/dt = u_C / L
 
 6. 简化处理：
    由于K3短接，u_C和i_L都会快速衰减，可以采用简化模型：
@@ -117,8 +86,7 @@ from graph import plot_circuit_results
 from serialize import save_results_to_csv
 from reader import get_stage2_final_values
 from circuit_params import (
-    C, R, Rg, L, R_K3, I_SCR_OFF_THRESHOLD, U0_CASE1, U0_CASE2,
-    U_BYPASS_THRESHOLD, R_BYPASS_TOTAL
+    C, R, Rg, L, R_K3, U0_CASE1, U0_CASE2
 )
 
 # ==================== 时间参数 ====================
@@ -126,26 +94,6 @@ from circuit_params import (
 T_START = 50e-3  # 50 毫秒 = 0.05 秒
 T_END = 200e-3  # 200 毫秒 = 0.2 秒
 DT = 10e-6  # 采样间隔：10 微秒 = 0.00001 秒
-
-
-def rectifier_bridge_voltage(i_l: float, epsilon: float = 1e-6) -> float:
-    """
-    计算整流桥（D1-D4 + SCR1）的电压，考虑电流方向
-    
-    参数：
-        i_l: 通过整流桥的电流（A）
-        epsilon: 平滑过渡参数（默认1e-6），用于tanh函数
-    
-    返回：
-        整流桥两端电压（V），从L端到GND端
-    """
-    # 使用平滑的符号函数 tanh(i_L/epsilon) 代替 sign(i_L)
-    sign_i_smooth = np.tanh(i_l / epsilon)
-    
-    # 统一表达式：u_bypass = sign(i_L) * U_threshold + R_total * i_L
-    u_bypass = sign_i_smooth * U_BYPASS_THRESHOLD + R_BYPASS_TOTAL * i_l
-    
-    return u_bypass
 
 
 def stage3_ode(t: float, y: np.ndarray) -> np.ndarray:
@@ -160,8 +108,7 @@ def stage3_ode(t: float, y: np.ndarray) -> np.ndarray:
         [du_C/dt, di_L/dt]
     
     注意：
-        - 拓扑：K3 | (L + bypass) | R | C（并联）
-        - 当L回路断开时：K3 | R | C（并联）
+        - 拓扑：K3 | L | R | C（并联）
         - u_C会快速衰减到接近0（因为R_K3很小）
     """
     u_c = y[0]
@@ -170,45 +117,19 @@ def stage3_ode(t: float, y: np.ndarray) -> np.ndarray:
     # 电流源电流
     i_s = neutral_current(t)
     
-    # 检查晶闸管是否关闭（i_L < 阈值）
-    scr_off = abs(i_l) < I_SCR_OFF_THRESHOLD
-    
     # 各支路电流（由于并联，电压都是u_C）
     i_k3 = u_c / R_K3  # K3回路电流
     i_r = u_c / R  # 电阻电流
     
-    if scr_off:
-        # L回路断开，拓扑变为：K3 | R | C
-        # KCL：i_s = i_K3 + i_R + i_C
-        # 其中：i_C = C · du_C/dt
-        # 因此：i_s = u_C/R_K3 + u_C/R + C·du_C/dt
-        # 整理得到：du_C/dt = (i_s - u_C/R - u_C/R_K3) / C
-        du_c_dt = (i_s - i_r - i_k3) / C
-        
-        # i_L衰减：L回路已断开，i_L应该快速衰减到0
-        # 为了避免数值问题，使用一个很小的固定衰减时间常数
-        # 当i_L已经很小时，直接设置为0以避免数值不稳定
-        if abs(i_l) < 1e-6:
-            # i_L已经非常小，直接设置为0，避免数值问题
-            di_l_dt = 0.0
-        else:
-            # 使用一个很小的固定衰减时间常数（例如1微秒），让i_L快速衰减
-            # 这样既能快速衰减到0，又不会导致数值不稳定
-            tau_l_fast = 1e-6  # 1微秒的衰减时间常数
-            di_l_dt = -i_l / tau_l_fast
-    else:
-        # L回路导通，拓扑：K3 | (L + bypass) | R | C
-        # KCL：i_s = i_K3 + i_L + i_R + i_C
-        # 其中：i_C = C · du_C/dt
-        # 因此：i_s = u_C/R_K3 + i_L + u_C/R + C·du_C/dt
-        # 整理得到：du_C/dt = (i_s - i_L - u_C/R - u_C/R_K3) / C
-        du_c_dt = (i_s - i_l - i_r - i_k3) / C
-        
-        # KVL：(L + bypass)支路：u_C = u_L + u_bypass
-        # 其中：u_L = L · di_L/dt, u_bypass = rectifier_bridge_voltage(i_L)
-        # 因此：di_L/dt = (u_C - u_bypass) / L
-        u_bypass = rectifier_bridge_voltage(i_l)
-        di_l_dt = (u_c - u_bypass) / L
+    # KCL：i_s = i_K3 + i_L + i_R + i_C
+    # 其中：i_C = C · du_C/dt
+    # 因此：i_s = u_C/R_K3 + i_L + u_C/R + C·du_C/dt
+    # 整理得到：du_C/dt = (i_s - i_L - u_C/R - u_C/R_K3) / C
+    du_c_dt = (i_s - i_l - i_r - i_k3) / C
+    
+    # KVL：L支路与K3、R、C并联，所以 u_C = u_L = L · di_L/dt
+    # 因此：di_L/dt = u_C / L
+    di_l_dt = u_c / L
     
     return np.array([du_c_dt, di_l_dt])
 
@@ -279,8 +200,9 @@ def simulate_stage3(u0: float, i_l0: float = 0.0, t_start: float = T_START,
     i_rg = i_s  # Rg电流（由KCL）
     
     # 计算各元件电压
-    # 由于K3、R、C、(L + bypass)并联，它们两端的电压都是u_C
-    u_k3 = u_c  # K3两端电压（与R、C并联，电压相同）
+    # 由于K3、R、C、L并联，它们两端的电压都是u_C
+    u_k3 = u_c  # K3两端电压（与R、C、L并联，电压相同）
+    u_l = u_c  # L两端电压（与K3、R、C并联，电压相同）
     u_rg = i_rg * Rg  # Rg两端电压
     u_s = u_c + u_rg  # 电流源两端电压（由KVL：u_s = u_C + u_Rg）
     
@@ -296,6 +218,7 @@ def simulate_stage3(u0: float, i_l0: float = 0.0, t_start: float = T_START,
         'i_rg': i_rg,
         'u_c': u_c,
         'u_k3': u_k3,  # K3两端电压（等于u_C）
+        'u_l': u_l,  # L两端电压（等于u_C）
         'u_rg': u_rg,
         'u_s': u_s,
     }
@@ -325,24 +248,18 @@ def print_summary(t: np.ndarray, u_c: np.ndarray, i_l: np.ndarray, results: dict
     print(f"  i_C = {results['i_c'][-1]:.6f} A")
     print(f"  i_Rg = {results['i_rg'][-1]:.6f} A")
     print(f"  u_s = {results['u_s'][-1]:.6f} V")
+    print(f"  u_C = {u_c[-1]:.6f} V")
+    print(f"  u_L = {results['u_l'][-1]:.6f} V")
     print(f"  u_Rg = {results['u_rg'][-1]:.6f} V")
     print(f"\n验证（KCL）:")
-    if abs(i_l[-1]) < I_SCR_OFF_THRESHOLD:
-        # L回路断开
-        print(f"  i_s = i_K3 + i_R + i_C (L回路断开):")
-        kcl_sum = results['i_k3'][-1] + results['i_r'][-1] + results['i_c'][-1]
-        print(f"    {results['i_s'][-1]:.6f} ≈ {kcl_sum:.6f}")
-        print(f"  误差: {abs(results['i_s'][-1] - kcl_sum):.6e} A")
-    else:
-        # L回路导通
-        print(f"  i_s = i_K3 + i_L + i_R + i_C (L回路导通):")
-        kcl_sum = results['i_k3'][-1] + i_l[-1] + results['i_r'][-1] + results['i_c'][-1]
-        print(f"    {results['i_s'][-1]:.6f} ≈ {kcl_sum:.6f}")
-        print(f"  误差: {abs(results['i_s'][-1] - kcl_sum):.6e} A")
+    print(f"  i_s = i_K3 + i_L + i_R + i_C:")
+    kcl_sum = results['i_k3'][-1] + i_l[-1] + results['i_r'][-1] + results['i_c'][-1]
+    print(f"    {results['i_s'][-1]:.6f} ≈ {kcl_sum:.6f}")
+    print(f"  误差: {abs(results['i_s'][-1] - kcl_sum):.6e} A")
     print(f"\n注意：")
-    print(f"  - 拓扑：K3 | (L + bypass) | R | C（并联）")
-    print(f"  - 当i_L < {I_SCR_OFF_THRESHOLD} A时，L回路断开，拓扑变为：K3 | R | C")
+    print(f"  - 拓扑：K3 | L | R | C（并联）")
     print(f"  - 由于R_K3很小，u_C快速衰减到接近0，大部分电流由K3接管（i_K3 ≈ i_s）")
+    print(f"  - L、R、C、K3并联，所以 u_L = u_C = u_R = u_K3")
     print(f"{'='*60}\n")
 
 
